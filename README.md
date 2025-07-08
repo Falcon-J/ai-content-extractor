@@ -7,7 +7,6 @@
 
 An intelligent web content extraction tool that combines advanced browser automation with AI-powered data parsing. Built with Streamlit, Selenium, and Gemma 3 AI model for intelligent content extraction and structuring.
 
-![AI Content Extractor Demo](https://via.placeholder.com/800x400/667eea/ffffff?text=AI+Content+Extractor)
 
 ## ✨ Features
 
