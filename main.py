@@ -191,28 +191,26 @@ with tab1:
         col1, col2 = st.columns([3, 1])
         
         with col1:
-            # Use form for Ctrl+Enter functionality
-            with st.form("extraction_form"):
-                # Template or custom query
-                if selected_template != "Custom":
-                    template_key = selected_template.lower().replace(" ", "_")
-                    default_query = get_template_query(template_key)
-                    data_type = EXTRACTION_TEMPLATES[template_key]["data_type"]
-                else:
-                    default_query = ""
-                    data_type = "general"
-                
-                parse_description = st.text_area(
-                    "What information do you want to extract?",
-                    value=default_query,
-                    placeholder="Example: Extract all email addresses and phone numbers",
-                    height=100,
-                    help="Be specific about what you want to extract. Press Ctrl+Enter to extract.",
-                    key="extraction_query"
-                )
-                
-                # Form submit button (automatically works with Ctrl+Enter)
-                extract_triggered = st.form_submit_button("Extract Information", disabled=not parse_description, type="primary")
+            # Template or custom query
+            if selected_template != "Custom":
+                template_key = selected_template.lower().replace(" ", "_")
+                default_query = get_template_query(template_key)
+                data_type = EXTRACTION_TEMPLATES[template_key]["data_type"]
+            else:
+                default_query = ""
+                data_type = "general"
+            
+            parse_description = st.text_area(
+                "What information do you want to extract?",
+                value=default_query,
+                placeholder="Example: Extract all email addresses and phone numbers",
+                height=100,
+                help="Be specific about what you want to extract.",
+                key="extraction_query"
+            )
+            
+            # Regular button (no form needed)
+            extract_triggered = st.button("Extract Information", disabled=not parse_description, type="primary")
         
         with col2:
             st.markdown("**💡 Extraction Tips:**")
@@ -221,14 +219,17 @@ with tab1:
             • Mention expected formats
             • Include context clues
             • Use action verbs like "extract", "find", "list"
-            • Press **Ctrl+Enter** to extract
             """)
-        
-        # Add keyboard shortcut info
-        st.markdown("💡 **Tip**: Press `Ctrl+Enter` in the text area to extract quickly!")
         
         if extract_triggered:
             extraction_start_time = time.time()
+            
+            # Debug information
+            if st.checkbox("Show debug information"):
+                st.write(f"**Environment**: {'Deployment' if IS_DEPLOYMENT else 'Local'}")
+                st.write(f"**Content length**: {len(st.session_state.dom_content) if 'dom_content' in st.session_state else 'No content'}")
+                st.write(f"**Parse description**: {parse_description}")
+                st.write(f"**Data type**: {data_type}")
             
             # Estimate processing time based on content length
             content_length = len(st.session_state.dom_content)
@@ -245,6 +246,12 @@ with tab1:
                     time_placeholder.info(f"⏱️ Estimated time: {estimated_time} seconds")
                     
                     progress_bar.progress(25)
+                    
+                    # Check if we have dom_content
+                    if not st.session_state.dom_content:
+                        st.error("No content available. Please scrape a website first.")
+                        st.stop()
+                    
                     dom_chunks = split_dom_content(st.session_state.dom_content)
                     
                     elapsed = time.time() - extraction_start_time
@@ -255,18 +262,27 @@ with tab1:
                     
                     # Define progress callback for AI processing
                     def update_progress(current_chunk, total_chunks):
-                        elapsed = time.time() - extraction_start_time
-                        avg_time_per_chunk = elapsed / current_chunk if current_chunk > 0 else 5
-                        remaining_chunks = total_chunks - current_chunk
-                        estimated_remaining = remaining_chunks * avg_time_per_chunk
-                        
-                        progress_percentage = 50 + (current_chunk / total_chunks) * 25  # 50% to 75%
-                        progress_bar.progress(int(progress_percentage))
-                        
-                        time_placeholder.info(f"⏱️ Processing chunk {current_chunk}/{total_chunks}... ~{estimated_remaining:.0f} seconds remaining")
+                        try:
+                            if current_chunk and total_chunks:
+                                elapsed = time.time() - extraction_start_time
+                                avg_time_per_chunk = elapsed / current_chunk if current_chunk > 0 else 5
+                                remaining_chunks = total_chunks - current_chunk
+                                estimated_remaining = remaining_chunks * avg_time_per_chunk
+                                
+                                progress_percentage = 50 + (current_chunk / total_chunks) * 25  # 50% to 75%
+                                progress_bar.progress(int(progress_percentage))
+                                
+                                time_placeholder.info(f"⏱️ Processing chunk {current_chunk}/{total_chunks}... ~{estimated_remaining:.0f} seconds remaining")
+                        except Exception as e:
+                            # Silently handle progress update errors
+                            pass
                     
                     # Parse the content with Ollama
-                    parsed_result = parse_with_ollama(dom_chunks, parse_description, update_progress)
+                    try:
+                        parsed_result = parse_with_ollama(dom_chunks, parse_description, update_progress)
+                    except Exception as e:
+                        st.error(f"Parsing error: {str(e)}")
+                        st.stop()
                     
                     elapsed = time.time() - extraction_start_time
                     remaining = max(0, estimated_time - elapsed)
@@ -275,7 +291,12 @@ with tab1:
                     progress_bar.progress(75)
                     
                     # Validate extraction
-                    quality_score, suggestions = validate_extraction(parsed_result, data_type)
+                    try:
+                        quality_score, suggestions = validate_extraction(parsed_result, data_type)
+                    except Exception as e:
+                        st.error(f"Validation error: {str(e)}")
+                        quality_score = 0.5
+                        suggestions = []
                     
                     progress_bar.progress(100)
                     extraction_time = time.time() - extraction_start_time
