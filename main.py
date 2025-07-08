@@ -605,9 +605,17 @@ with tab3:
 
 # Footer
 st.divider()
-st.markdown(
-    "<div style='text-align: center; color: #666; padding: 1rem;'>"
-    "🤖 AI Content Extractor - Powered by Gemma 3 & LangChain"
-    "</div>", 
-    unsafe_allow_html=True
-)
+if IS_DEPLOYMENT:
+    st.markdown(
+        "<div style='text-align: center; color: #666; padding: 1rem;'>"
+        "🤖 AI Content Extractor - Demo Mode (Pattern Matching)"
+        "</div>", 
+        unsafe_allow_html=True
+    )
+else:
+    st.markdown(
+        "<div style='text-align: center; color: #666; padding: 1rem;'>"
+        "🤖 AI Content Extractor - Powered by Gemma 3 & LangChain"
+        "</div>", 
+        unsafe_allow_html=True
+    )
